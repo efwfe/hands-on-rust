@@ -1,6 +1,14 @@
 use bracket_lib::prelude::*;
 
+// Game state
 struct State {}
+
+// Game Modes
+enum GameMode{
+    Menu,
+    Playing,
+    End,
+}
 
 impl GameState for State{
     fn tick(&mut self, ctx: &mut BTerm){
