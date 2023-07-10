@@ -9,19 +9,23 @@ struct State {
     mode: GameMode,
     frame_time:f32,
     player:Player,
+    score: i32,
+    obstacle: Obstacle
 }
+
 
 impl State{
     fn new()->Self{
         State {
-             mode: GameMode::Menu, 
-             frame_time: 0.0,
-             player: Player::new(5, 25)
-        }
+            mode: GameMode::Menu, 
+            frame_time: 0.0,
+            player: Player::new(5, 25),
+            score: 0,
+            obstacle: Obstacle::new(SCREEN_WIDTH, SCREEN_HEIGHT)            
     }
 }
 
-impl State{
+
     // Play function stub
     fn play(&mut self, ctx: &mut BTerm){
         ctx.cls_bg(NAVY);
@@ -37,7 +41,13 @@ impl State{
         }
         self.player.render(ctx);
         ctx.print(0,0, "Press SPACE to flap");
-        if self.player.y > SCREEN_HEIGHT {
+        ctx.print(0, 1, &format!("Score: {}", self.score));
+        self.obstacle.render(ctx, self.player.x);
+        if self.player.x > self.obstacle.x{
+            self.score += 1;
+            self.obstacle = Obstacle::new(self.player.x + SCREEN_WIDTH, self.score);
+        }
+        if self.player.y > SCREEN_HEIGHT|| self.obstacle.hit_obstacle(&self.player) {
             self.mode = GameMode::End;
         }
     }
@@ -69,6 +79,7 @@ impl State{
     fn dead(&mut self, ctx:&mut BTerm){
         ctx.cls();
         ctx.print_centered(5, "You are dead!");
+        ctx.print_centered(6, &format!("You earned {} points", self.score));
         ctx.print_centered(8, "(P) Play Again");
         ctx.print_centered(9, "(Q) Quit Game");
         if let Some(key) = ctx.key{
@@ -135,6 +146,58 @@ impl GameState for State{
     }
 }
 
+// obstacles and keep score
+struct Obstacle{
+    x: i32,      // x定义在游戏中的位置
+    gap_y: i32,  // 定义缝隙中心位置
+    size:i32     // size定义障碍中的间隙长度
+}
+
+impl Obstacle {
+    fn new(x:i32, score:i32)->Self{
+        let mut random = RandomNumberGenerator::new();
+        Obstacle {
+             x, 
+             gap_y:random.range(10, 40), 
+             size: i32::max(2, 20-score) 
+        }
+    }
+
+    fn render(&mut self, ctx: &mut BTerm, player_x: i32){
+        let screen_x = self.x - player_x;
+        let half_size = self.size / 2;
+
+        // 
+        for y in 0..self.gap_y - half_size{
+            ctx.set(
+                screen_x, 
+                y, 
+                RED, 
+                BLACK, 
+            to_cp437('/'))
+        }
+
+        // 
+        for y in self.gap_y + half_size..SCREEN_HEIGHT{
+            ctx.set(
+                screen_x, 
+                y, 
+                RED, 
+                BLACK, 
+            to_cp437('/'))
+        }
+    }
+
+    fn hit_obstacle(&self, player: &Player) -> bool {
+        let half_size = self.size /2 ;
+        let does_x_match = player.x == self.x;                    // 如果一个玩家的x坐标匹配到障碍物
+        let player_above_gap = player.y < self.gap_y - half_size; // 比较玩家的y坐标与障碍物的上边界
+        let player_below_gap = player.y > self.gap_y + half_size; // 比较障碍物的坐标与障碍物的下边界
+
+        does_x_match && (player_above_gap || player_below_gap)
+
+    }
+}
 
 fn main() -> BError {
    let context = BTermBuilder::simple80x50()
